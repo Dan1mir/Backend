@@ -3,8 +3,7 @@
 
 Для начала работы необходимо установить следующие зависимости:
 
-- express
-- pg
+- express pg
 - nodemon
 
 Для этого выполните следующие команды в терминале:
@@ -62,11 +61,13 @@ const pool = new Pool({
   port: 5432,
   database: "название_бд"
 });
+
+module.exports = pool
 ```
 
-Замените `название_бд` на имя вашей базы данных.
+Замените `название_бд` на имя вашей базы данных которую мы создадим далее.
 
-## Создание таблицы
+## Создание базы данных и таблицы
 
 Для создания таблицы в базе данных необходимо выполнить следующие действия:
 
@@ -77,14 +78,12 @@ const pool = new Pool({
 - Создайте файл `database.sql` в корневой папке проекта и в нем напишите команду для создания таблицы, например:
 
 ```sql
-create table название_бд (
+create table название_таблицы (
   id serial primary key,
   name varchar(255),
   description varchar(255)
 );
 ```
-
-Замените `название_бд` на имя вашей базы данных и укажите нужные поля для таблицы.
 
 - Вернитесь в PowerShell, пропишите команду `\connect название_бд` и вставьте код таблицы, что вы написали в файле `database.sql`.
 
@@ -93,9 +92,9 @@ create table название_бд (
 ## Создание запросов
 
 В корневой папке проекта создайте две новые папки `controllers`, в ней мы будем работать непосредственно с запросами, и папку `routes` в которой будут маршруты по которым нужно будет отправлять сами запросы.
-В каждой из новосозданных папок создайте одноимённый js файл.
+В каждой из новосозданных папок создайте js файл, я их назвал `car.controllers` и `car.routes` .
 
-В файле controllers создайте новый класс и внутри него создайте ассинхронные функции:
+В файле `controllers` создайте новый класс и внутри него создайте ассинхронные функции для создания, получения, обновления и удаления данных в бд:
 
 ```javascript
 class Controller{
@@ -111,4 +110,95 @@ class Controller{
   }
 }
 module.exports = new Controller()
+```
+
+В файле `routes` получаем из express класс Router.
+
+```javascript
+const Router = require('express')
+const router = new Router()
+const Controller = require('../controller/car.controller.js')//Сразу-же импортируем класс контроллера который мы создали
+
+module.export = router
+```
+Далее в этом-же файле для каждой из функций определим маршрут по которой она будет отрабатывать по шаблону `url, автор.функция`:
+
+```javascript
+router.post('/car', Controller.create)
+router.get('/car', Controller.getAll)
+router.get('/car/:id', Controller.getOne) //указываем id для получения нужного объекта
+router.put('/car', Controller.update)
+router.delete('/car/:id', Controller.delete) //то-же самое
+```
+
+Теперь необходимо вернуться в файл `index.js` и экспортировать наш Router:
+```javascript
+const Router = require('./routes/car.routes.js')
+```
+А также добавить запрос на него:
+```javascript
+app.use(express.json)
+app.use(Router)
+```
+
+## Функционал
+
+Вернёмся в файл `car.controllers`.
+Попробуем написать первый post запрос на добавление новой записи (в этом случае машины) в нашу базу данных, для этого экспортируем её в наш файл:
+```javascript
+const db = require('../db.js')
+```
+Так как post запрос имеет тело, воспользуемся деструктуризацией:
+```javascript
+async create(req, res){
+  const{name, description} = req.body
+  const newCar = await db.query(`INSERT INTO название_таблицы (name, description) values ($1, $2) RETURNING *`, [name, description])
+  res.json(newCar.rows[0])
+}
+```
+> [!TIP]
+> Вы можете проверить работает ли добавление записей.
+>  Зайдите в Postman, выберете `POST` запрос и напишите url, в моём случае это `http://localhost:8080/car`. Выберете пункт body, выберете там JSON и введите в окне ниже данные которые есть в вашей таблице.
+>  В моём случае запрос выглядит так:
+>  ```json
+>  {
+>    "name": "test",
+>    "description": "test"
+>  }
+>  ```
+>  И отправляете запрос на кнопку Send.
+>  Далее возвращаемся в PowerShell и командой `select * from название_таблицы;` проверяете добавились ли в неё данные.
+
+Продолжим писать запросы.
+Следующий запрос на получение всех записей из таблицы. Это в как-раз та-же операция что мы делали в субд.
+```javascript
+async getAll(req, res){
+  const cars = await db.query(`SELECT * FROM название_таблицы`)
+  res.json(cars.rows)
+}
+```
+Далее запрос на получение одной конкретной записи.
+Запрос будет почти такой-же как и прошлый за исключением того что мы получаем из параметров запроса id.
+```javascript
+async getOne(req, res){
+  const id = req.params.id
+  const car = await db.query(`SELECT * FROM название_таблицы where id = $1`, [id])
+  res.json(car.rows[0])
+}
+```
+
+Следующий запрос - обновление данных.
+Получаем из тела запроса его id, и данные которые вы внесли в таблицу, в моём случае это name и description.
+```javascript
+async update(req, res){
+  const {id, name, description} = req.body
+  const update = await db.query(`UPDATE название_таблицы set name = $1, description = $2 where id = $3 RETURNING *`, [name, description, id])
+  res.json(update.rows[0])
+}
+```
+
+Остаётся последняя функция - удаление.
+Она очень похожа на getOne, поэтому всё что мы сделаем это скопируем код и отредактируем sql запрос.
+```javascript
+  const deleteCar = await db.query(`DELETE FROM название_таблицы where id = $1`, [id])
 ```
