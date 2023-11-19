@@ -202,3 +202,193 @@ async update(req, res){
 ```javascript
   const deleteCar = await db.query(`DELETE FROM название_таблицы where id = $1`, [id])
 ```
+На этом основная работа с базами данных будет закончена.
+
+## Визуал.
+
+В корневой папке проекта создайте файл `index.html`, в нём нам понадобится создать поля imput, создавайте столько-же полей сколько вы создали полей данных в вашей базе данных. В моём случае понадобится два поля. Я буду использовать bootstrap для облегчения работы.
+```HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+</head>
+<body>
+    <div class="container">
+        <form class="form mb-3" id="form">
+            <div class="row m-auto">
+                <div class="mb-3">
+                    <input id="car-name" class="form-control" placeholder="Название">
+                </div>
+                <div class="mb-3">
+                    <input id="car-description" class="form-control" placeholder="Описание">
+                </div>
+            </div>
+            <div class="btn-group float-end">
+                <button class="btn btn-primary">Добавить</button>
+            </div>
+        </form>
+
+        <div class="row mt-5 mb-2" id="car-list">
+
+        </div>
+    </div>
+    <script type="module" src="/frontend/main.js"></script>
+</body>
+</html>
+```
+
+Далее создайте в корневой папке новую папку и назовите её `frontend`, там создайте файл `requests.js`.
+В нём мы экспортируем все созданные нами функции:
+```javascript
+export async function create(car){
+    await fetch('http://localhost:8080/car', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: car.name,
+            description: car.description,
+        })
+    })
+}
+export async function getAll(){
+    const response = await fetch('http://localhost:8080/car', {
+        method: 'GET'
+    })
+    const result = await response.json()
+    console.log(result)
+    return result
+}
+export async function getOne(id){
+    const response = await fetch('http://localhost:8080/car/' + id, {
+        method: 'GET'
+    })
+    const result = await response.json()
+    console.log(result)
+    return result
+}
+export async function delete(id){
+    await fetch('http://localhost:8080/car/' + id, {
+        method: 'DELETE'
+    })
+}
+export async function update(car){
+    await fetch('http://localhost:8080/car', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            id: car.id,
+            name: car.name,
+            description: car.description,
+        })
+    })
+}
+```
+
+Далее в той-же папке создайте новую папку с названием `components` ив  ней файл `item.js`.
+В файл вы должны экспортировать функцию createItem которая будет принимать поля вашей бд.
+Далее создаёте карточку item которая будет отображаться при добавлении новой записи в бд, вот что вышло у меня:
+```javascript
+export function createItem(name, description){
+    let divBody = document.createElement('div')
+    let h5 = document.createElement('h5')
+    let pDescription = document.createElement('p')
+
+    let buttongroup = document.createElement('div')
+    let btnDetail = document.createElement('button')
+    let btnDelete = document.createElement('button')
+
+    // item.id = _id
+    item.classList.add('card', 'm-3')
+    item.style.width = '18rem'
+    item.style.float = 'left'
+
+    image.classList.add('card-img-top')
+
+    divBody.classList.add('card-body')
+
+    h5.classList.add('card-title')
+    h5.innerText = name
+
+    pDescription.classList.add('card-text')
+    pDescription.innerText = description
+
+
+    buttongroup.classList.add('btn-group', 'float-end')
+    btnDetail.classList.add('btn', 'btn-primary')
+    btnDetail.textContent = "Подробнее"
+
+    btnDelete.classList.add('btn', 'btn-danger')
+    btnDelete.textContent = "Удалить"
+
+    buttongroup.append(btnDetail, btnDelete)
+    divBody.append(h5, pDescription, buttongroup)
+
+    item.append(divBody)
+
+    return {item, btnDetail, btnDelete}
+}
+```
+
+В папке `frontend` создайте ещё один файл `main.js`, в него импортируем два файла что мы только-что написали а также их функции
+```javascript
+import { createItem } from "./components/item.js"
+import { getAll, getOne, create, delete, update } from "./requests.js"
+```
+Далее создаём немедленно вызываемую функцию и в ней объявляем класс с конструктором, в моём случае я его назвал Car
+```javascript
+(function(){
+    class Car{
+        constructor(name, description){
+            this.name = name
+            this.description = description
+        }
+        newCar(id, name, description){
+            this.id = id
+            this.name = name
+            this.description = description
+        }
+    }
+    const list = document.getElementById('car-list')
+
+
+    async function generateElements(){
+        const cars = await getAllCars()
+        for(let car of cars){
+            let listItem = createItem(car.name, car.description)
+            listItem.btnDelete.addEventListener('click', function(){
+                if(confirm("Вы уверены что хотите удалить?")){
+                    deleteCar(car.id)
+                    listItem.item.remove()
+
+                }
+
+            })
+            listItem.btnDetail.addEventListener('click', function(){
+                window.location.replace('https://www.youtube.com/watch?v=dwlz6p_LZnY')
+            })
+            list.append(listItem.item)
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+
+        const form = document.getElementById('form')
+        generateElements()
+        form.addEventListener('submit', function(e){
+            e.preventDefault()
+
+            let carName = document.getElementById('car-name')
+            let carDescription = document.getElementById('car-price')
+
+            let listItem = createItem(carName.value, carDescription.value)
+            let car = new Car(carName.value, carDescription.value)
+            createCar(car)
+            list.append(listItem.item )
+        })
+    })
+})()
+```
