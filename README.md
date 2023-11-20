@@ -11,8 +11,14 @@
 
 ```bash
 npm init -y
+```
+```bash
 npm install express pg
+```
+```bash
 npm install -D nodemon
+```
+```bash
 npm install -i cors
 ```
 
