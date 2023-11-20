@@ -5,6 +5,7 @@
 
 - express pg
 - nodemon
+- cors
 
 Для этого выполните следующие команды в терминале:
 
@@ -12,6 +13,7 @@
 npm init -y
 npm install express pg
 npm install -D nodemon
+npm install -i cors
 ```
 
 ## Создание сервера
@@ -71,8 +73,7 @@ module.exports = pool
 
 Для создания таблицы в базе данных необходимо выполнить следующие действия:
 
-- Откройте папку, в которой установлен PostgreSQL, и в ней папку `bin`.
-- Откройте в этой папке PowerShell и используя команду `psql -U postgres` и введя пароль, войдите в субд.
+- Откройте консоль PostgreSQL и введя пароль, войдите в субд.
 - Если у вас имеются какие-то проблемы с кодировкой, то введите команду `psql \! chcp 1251`, текст должен отображаться корректно.
 - После успешного входа в субд создайте новую базу данных, введя команду `create database название_бд;`
 - Создайте файл `database.sql` в корневой папке проекта и в нем напишите команду для создания таблицы, например:
@@ -86,8 +87,7 @@ create table название_таблицы (
 ```
 
 - Вернитесь в PowerShell, пропишите команду `\connect название_бд` и вставьте код таблицы, что вы написали в файле `database.sql`.
-
-После этих шагов таблица должна быть создана в базе данных.
+- Если вывело сообщение `CREATE DATABASE` то база данных была успешно создана.
 
 ## Создание запросов
 
@@ -200,7 +200,8 @@ async update(req, res){
 Остаётся последняя функция - удаление.
 Она очень похожа на getOne, поэтому всё что мы сделаем это скопируем код и отредактируем sql запрос.
 ```javascript
-  const deleteCar = await db.query(`DELETE FROM название_таблицы where id = $1`, [id])
+  const delete = await db.query(`DELETE FROM название_таблицы where id = $1`, [id])
+  res.json(delete.rows[0])
 ```
 На этом основная работа с базами данных будет закончена.
 
@@ -240,9 +241,15 @@ async update(req, res){
 </body>
 </html>
 ```
-
+Так как далее мы быдем получать данные из одной локальной ссылке в другой, нужно подключить импортированный ранее метод cors в `index.js`.
+```javascript
+const cors = require('cors')
+```
+```javascript
+app.use(cors())
+```
 Далее создайте в корневой папке новую папку и назовите её `frontend`, там создайте файл `requests.js`.
-В нём мы экспортируем все созданные нами функции:
+В нём мы экспортируем все созданные нами функции используя fetch функцию cors. Это нужно для доступа к бд через фронтенд:
 ```javascript
 export async function create(car){
     await fetch('http://localhost:8080/car', {
@@ -288,9 +295,11 @@ export async function update(car){
 }
 ```
 
-Далее в той-же папке создайте новую папку с названием `components` ив  ней файл `item.js`.
+Далее в той-же папке создайте новую папку с названием `components` и в ней файл `item.js`.
+Это будет наш видимый компонент который мы будет создавать вытягивая данные из бд.
 В файл вы должны экспортировать функцию createItem которая будет принимать поля вашей бд.
-Далее создаёте карточку item которая будет отображаться при добавлении новой записи в бд, вот что вышло у меня:
+Далее создаёте карточку item которая будет отображаться при добавлении новой записи в бд.
+Вот что вышло у меня:
 ```javascript
 export function createItem(name, description){
     let divBody = document.createElement('div')
@@ -301,7 +310,6 @@ export function createItem(name, description){
     let btnDetail = document.createElement('button')
     let btnDelete = document.createElement('button')
 
-    // item.id = _id
     item.classList.add('card', 'm-3')
     item.style.width = '18rem'
     item.style.float = 'left'
@@ -333,12 +341,12 @@ export function createItem(name, description){
 }
 ```
 
-В папке `frontend` создайте ещё один файл `main.js`, в него импортируем два файла что мы только-что написали а также их функции
+В папке `frontend` создайте ещё один файл `main.js`, в него импортируем два файла что мы только-что написали а также их функции.
 ```javascript
 import { createItem } from "./components/item.js"
 import { getAll, getOne, create, delete, update } from "./requests.js"
 ```
-Далее создаём немедленно вызываемую функцию и в ней объявляем класс с конструктором, в моём случае я его назвал Car
+Далее создаём немедленно вызываемую функцию и в ней объявляем класс с конструктором, в моём случае я его назвал Car.
 ```javascript
 (function(){
     class Car{
